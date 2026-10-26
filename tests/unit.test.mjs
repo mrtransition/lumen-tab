@@ -14,6 +14,7 @@ const Store = require(path.join(root, 'store.js'));
 const AIApi = require(path.join(root, 'ai-api.js'));
 const Markdown = require(path.join(root, 'markdown.js'));
 const Weather = require(path.join(root, 'weather.js'));
+const WeTab = require(path.join(root, 'webtab-import.js'));
 
 function memStorage() {
   const map = new Map();
@@ -854,6 +855,110 @@ test('markdown: 代码块、换行与危险链接', () => {
   assert.match(danger, /href="https:\/\/a\.test\/x"/);
 });
 
+test('webtab: 备份识别、转换与清洗', () => {
+  const backup = {
+    version: '2.2.50',
+    platform: 'edge',
+    data: {
+      'store-icon': {
+        icons: [
+          {
+            id: 'cat-work',
+            iconClass: 'icon-keji',
+            name: '工作',
+            children: [
+              {
+                type: 'site', id: 'site-github', name: 'GitHub',
+                target: 'https://github.com/',
+                bgType: 'image', bgImage: 'https://static.example/icon.png'
+              },
+              {
+                type: 'site', id: 'site-example', name: '',
+                target: 'https://example.com/a',
+                bgType: 'color', bgColor: 'rgba(28, 28, 30, 1)'
+              },
+              { type: 'site', id: 'site-local', name: '本地文件', target: 'C:/docs/index.html' },
+              { type: 'widget', id: 'w-ai', name: 'AI', widgetName: 'widget-chatgpt' }
+            ]
+          },
+          {
+            id: 'cat-empty',
+            iconClass: 'i:stars-28-outline-bold',
+            name: 'AI办公',
+            children: [{ type: 'widget', id: 'w-more', name: 'PPT', widgetName: 'widget-aippt' }]
+          }
+        ],
+        dockIdList: ['site-github', 'missing-id']
+      },
+      'store-setting': {
+        followSystem: true,
+        theme: 'dark',
+        leftBarDisplayStatus: 'hide',
+        iconOpenMethod: 'new-tab'
+      },
+      'store-weather': {
+        activeCityId: '101110101',
+        addedCity: [{ id: '101110101', name: '西安', lat: '34.34321', lon: '108.93965' }]
+      },
+      'store-wallpaper': {
+        bgType: 'image',
+        src: 'https://static.example/wallpaper.jpg',
+        blur: 6
+      }
+    }
+  };
+
+  assert.equal(WeTab.isWeTab(backup), true);
+  assert.equal(WeTab.isWeTab({ settings: {}, categories: [] }), false);
+  assert.equal(WeTab.isWeTab({ data: { 'store-icon': { icons: [] } } }), true);
+  assert.equal(WeTab.convert({ data: { 'store-icon': { icons: [] } } }).ok, false);
+  assert.equal(WeTab.convert({}).ok, false);
+
+  const res = WeTab.convert(backup);
+  assert.equal(res.ok, true);
+  assert.equal(res.meta.categories, 2);
+  assert.equal(res.meta.sites, 2);
+  assert.equal(res.meta.invalidSites, 1);
+  assert.equal(res.meta.widgetsSkipped, 2);
+  assert.equal(res.meta.emptyCategories, 1);
+  assert.equal(res.meta.imageIcons, 1);
+  assert.equal(res.meta.dockTotal, 2);
+  assert.equal(res.meta.dockImported, 1);
+  assert.equal(res.meta.wallpaperImported, false);
+  assert.equal(res.meta.wallpaperSkipped, true);
+  assert.equal(res.meta.weatherMapped, true);
+  assert.equal(res.meta.weatherCity, '西安');
+
+  const checked = Store.validateImport(res.state);
+  assert.equal(checked.ok, true);
+  const s = checked.state;
+  assert.equal(s.categories.length, 2);
+  assert.equal(s.categories[0].name, '工作');
+  assert.equal(s.categories[0].emoji, '💼');
+  assert.equal(s.categories[0].items.length, 2);
+  assert.equal(s.categories[0].items[0].name, 'GitHub');
+  assert.equal(s.categories[0].items[0].url, 'https://github.com/');
+  assert.equal(s.categories[0].items[0].emoji, 'G');
+  assert.match(s.categories[0].items[0].color, /^#[0-9a-f]{6}$/);
+  assert.equal(s.categories[0].items[1].name, 'example.com');
+  assert.equal(s.categories[0].items[1].emoji, 'e');
+  assert.equal(s.categories[0].items[1].color, '#1c1c1e');
+  assert.equal(s.categories[1].items.length, 0);
+  assert.equal(s.settings.theme, 'auto');
+  assert.equal(s.settings.railCollapsed, true);
+  assert.equal(s.settings.openInNewTab, true);
+  assert.equal(s.weatherCity, 'xian');
+  assert.equal(s.shortcuts.length, 1);
+  assert.equal(s.shortcuts[0].name, 'GitHub');
+  assert.equal(s.todos.length, 0, 'WeTab 导入不应带入 Lumen 示例待办');
+  assert.equal(Store.sanitizeSettings({ theme: 'auto' }, D.defaultState(FIXED).settings).theme, 'auto');
+
+  assert.equal(WeTab.parseColor('rgba(28, 28, 30, 1)'), '#1c1c1e');
+  assert.equal(WeTab.parseColor('rgb(28, 28, 30)'), '#1c1c1e');
+  assert.equal(WeTab.parseColor('rgba(28, 28, 30, 0.2)'), null);
+  assert.equal(WeTab.parseColor('#abc'), '#aabbcc');
+});
+
 test('图标库完整', () => {
   ['sun', 'cloud', 'rain', 'snow', 'settings', 'grid', 'sparkles', 'plus', 'x', 'check', 'search', 'stop'].forEach((n) => {
     assert.ok(Icons.has(n), n);
@@ -883,7 +988,7 @@ test('扩展清单与资源完整', () => {
   ['index.html', 'css/base.css', 'css/widgets.css', 'css/pages.css', 'css/panels.css'].forEach((rel) => {
     assert.ok(fs.existsSync(path.join(productDir, rel)), rel);
   });
-  ['icons', 'util', 'data', 'store', 'widgets-core', 'widgets-prod', 'search', 'ui', 'pages', 'ai', 'ai-api', 'markdown', 'weather', 'app'].forEach((name) => {
+  ['icons', 'util', 'data', 'store', 'widgets-core', 'widgets-prod', 'search', 'ui', 'pages', 'ai', 'ai-api', 'markdown', 'weather', 'webtab-import', 'app'].forEach((name) => {
     assert.ok(fs.existsSync(path.join(productDir, 'js', name + '.js')), name + '.js');
   });
 });

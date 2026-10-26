@@ -177,7 +177,7 @@
     var out = clone(fallback || D.defaultState(Date.now()).settings);
     if (!isObj(raw)) return out;
     if (typeof raw.name === 'string') out.name = raw.name.trim().slice(0, 20);
-    if (raw.theme === 'dark' || raw.theme === 'light') out.theme = raw.theme;
+    if (raw.theme === 'dark' || raw.theme === 'light' || raw.theme === 'auto') out.theme = raw.theme;
     if (D.ACCENTS.some(function (a) { return a.id === raw.accent; })) out.accent = raw.accent;
     if (D.ENGINES.some(function (e) { return e.id === raw.searchEngine; })) out.searchEngine = raw.searchEngine;
     out.weatherSource = raw.weatherSource === 'demo' ? 'demo' : 'live';

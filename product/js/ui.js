@@ -1077,23 +1077,55 @@
       var file = els.importFile.files && els.importFile.files[0];
       els.importFile.value = '';
       if (!file) return;
-      confirmDialog({
-        title: '导入备份',
-        message: '将用「' + file.name + '」覆盖当前全部分类、网站、待办与外观设置，建议先导出备份。',
-        confirmText: '导入'
-      }).then(function (ok) {
-        if (!ok) return;
-        U.readJSONFile(file).then(function (json) {
-          var res = store.replace(json);
+      U.readJSONFile(file).then(function (json) {
+        var WeTab = root.LumenWeTabImport;
+        var isWeTab = !!(WeTab && WeTab.isWeTab(json));
+        var converted = null;
+        var message;
+        if (isWeTab) {
+          converted = WeTab.convert(json);
+          if (!converted.ok) throw new Error(converted.error);
+          var m = converted.meta;
+          message = '检测到 WeTab 备份：' + m.categories + ' 个分类、' + m.sites + ' 个网站';
+          if (m.dockImported) message += '、' + m.dockImported + ' 个 Dock';
+          message += '。';
+          if (m.widgetsSkipped) message += 'WeTab 组件（' + m.widgetsSkipped + ' 个）不会导入；';
+          if (m.imageIcons) message += m.imageIcons + ' 个图片图标会转成文字色块；';
+          message += '远程壁纸不会导入。';
+          if (m.emptyCategories) message += m.emptyCategories + ' 个仅含组件的分类会保留为空。';
+          if (m.dockTotal > m.dockImported) {
+            message += 'Dock 仅恢复 ' + m.dockImported + '/' + m.dockTotal + ' 个（其余链接未包含在备份里）。';
+          }
+          message += '导入会覆盖当前全部分类、网站和外观设置。';
+        } else {
+          message = '将用「' + file.name + '」覆盖当前全部分类、网站、待办与外观设置，建议先导出备份。';
+        }
+        return confirmDialog({
+          title: isWeTab ? '导入 WeTab 备份' : '导入备份',
+          message: message,
+          confirmText: '导入'
+        }).then(function (ok) {
+          if (!ok) return;
+          var res = store.replace(converted ? converted.state : json);
           if (!res.ok) throw new Error(res.error);
           ctx.rerender();
           ctx.renderDock();
           syncSettings();
           refreshLists();
-          toast('备份已导入', 'ok');
-        }).catch(function (err) {
-          toast('导入失败：' + err.message, 'err');
+          if (isWeTab) {
+            var state = store.get();
+            var sites = state.categories.reduce(function (n, cat) {
+              return n + cat.items.filter(function (item) { return item.kind === 'site'; }).length;
+            }, 0);
+            var skipped = converted.meta.widgetsSkipped;
+            toast('WeTab 已导入：' + state.categories.length + ' 个分类 / ' + sites + ' 个网站' +
+              (skipped ? '，跳过 ' + skipped + ' 个组件' : ''), 'ok');
+          } else {
+            toast('备份已导入', 'ok');
+          }
         });
+      }).catch(function (err) {
+        toast('导入失败：' + err.message, 'err');
       });
     });
     els.resetBtn.addEventListener('click', function () {

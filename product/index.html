@@ -305,14 +305,14 @@
 
       <section class="pane" data-pane="data" hidden>
         <h3>备份与恢复</h3>
-        <p class="muted">导出为 JSON 文件，换设备时再导入；分类、网站、组件与设置都会带上，API Key 除外。</p>
+        <p class="muted">导出为 JSON 文件，换设备时再导入；分类、网站、组件与设置都会带上，API Key 除外。也支持直接导入 WeTab 导出的 <code>.data</code> 备份。</p>
         <div class="btn-row">
           <button class="ghost-btn" type="button" id="exportBtn">
             <span data-icon="download" data-size="16"></span>导出备份
           </button>
           <label class="ghost-btn" for="importFile">
             <span data-icon="upload" data-size="16"></span>导入备份
-            <input type="file" id="importFile" accept="application/json,.json" hidden>
+            <input type="file" id="importFile" accept="application/json,.json,.data" hidden>
           </label>
         </div>
         <h3>存储</h3>
@@ -326,8 +326,8 @@
       </section>
 
       <section class="pane" data-pane="about" hidden>
-        <h3>Lumen Tab <span class="tag">v1.4.0</span></h3>
-        <p class="muted">一个离线可用的新标签页：分类侧栏、网站与文件夹、小组件、搜索和 AI 助手。默认本地规则；联网入口只有实时天气（Open-Meteo，可切演示）与主动开启的 AI API 模式。</p>
+        <h3>Lumen Tab <span class="tag">v1.5.0</span></h3>
+        <p class="muted">一个离线可用的新标签页：分类侧栏、网站与文件夹、小组件、搜索和 AI 助手。可导入 WeTab 备份；默认本地规则，联网入口只有实时天气（Open-Meteo，可切演示）与主动开启的 AI API 模式。</p>
         <h3>快捷键</h3>
         <ul class="key-list">
           <li><kbd>/</kbd><span>聚焦搜索框</span></li>
@@ -406,6 +406,7 @@
   <script src="js/util.js"></script>
   <script src="js/data.js"></script>
   <script src="js/weather.js"></script>
+  <script src="js/webtab-import.js"></script>
   <script src="js/store.js"></script>
   <script src="js/widgets-core.js"></script>
   <script src="js/widgets-prod.js"></script>

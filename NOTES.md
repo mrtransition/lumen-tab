@@ -5,7 +5,7 @@
 ## 1. 运行环境与仓库
 
 - 仓库：<https://github.com/mrtransition/lumen-tab>（公开，默认分支 `main`）
-- 首次发布：2026-10-26，初始版本 `1.4.0`（初始提交 `d774a73`）
+- 首次发布：2026-10-26，初始版本 `1.4.0`（初始提交 `d774a73`）；当前发布 `1.5.0`（WeTab 备份导入）
 - 目标浏览器：Chrome / Edge，扩展使用 Manifest V3；页面在 `file://` 下可直接打开。
 - Node.js 22+（`node:test` + 内置 WebSocket）；无构建步骤、无 npm 依赖。
 - QA 默认查找 Windows Edge / Chrome，可用 `EDGE_PATH` 指定其它路径；`QA_REAL_WEATHER=1` 可跳过天气 mock。
@@ -18,6 +18,7 @@
 4. **模拟数据可复现**：热榜 / 每日一句 / 习惯初始数据用「日期字符串哈希 + mulberry32」生成，同一天刷新结果稳定；天气默认实时，失败或切到演示时使用同一套种子算法。
 5. **AI 双模式**：默认本地规则引擎（不联网，可执行待办 / 番茄钟动作）；设置 → AI 可切换到 OpenAI 兼容 API，使用用户填写的地址、模型、Key，支持流式回复、停止生成，以及 `reasoning_content` / 内联 `think` 思考过程折叠展示。API Key 不进导出备份。
 6. 不使用经典脚本 module（file:// 下 ES module 会被 CORS 拦），全部用 IIFE 挂到 `globalThis`。
+7. **WeTab 备份只做本地迁移**：`webtab-import.js` 识别 WeTab 导出的 `.data`（JSON）。只读分类 / 网站 / Dock / 少量设置，不下载远程图标或壁纸；图片图标退化为文字色块，组件与云端数据不迁移。
 
 ## 3. 目录结构
 
@@ -40,6 +41,7 @@ lumen-tab/
 │     ├─ util.js             # 日期、种子随机、DOM、URL、文件工具
 │     ├─ data.js             # 引擎、壁纸、城市（含经纬度）、名句、热榜、默认分类与网站
 │     ├─ weather.js          # Open-Meteo 客户端、WMO 映射、10 分钟缓存与离线回退
+│     ├─ webtab-import.js    # WeTab `.data` 识别、分类/网站/Dock 映射与清洗
 │     ├─ store.js            # 状态 + localStorage + 分类动作 + 导入迁移
 │     ├─ widgets-core.js     # 年度进度/天气/日历/名句/热榜
 │     ├─ widgets-prod.js     # 待办/便签/倒计时/习惯/番茄钟
@@ -108,6 +110,8 @@ aiMessages: [{ role, text, reasoning, ts }]
 文件夹：`addFolder/renameFolder/addSiteToFolder/updateFolderSite/removeSiteFromFolder`。
 兼容层 `hasWidget/addWidget/removeWidget/setWidgetSize/moveWidget` 都作用于当前分类。
 
+WeTab 导入：识别 `data.store-icon.icons`；每个分类 → Lumen 分类，`type:'site'` → 网站，`type:'widget'` 统一跳过并计数。网站只接受 `normalizeWebUrl` 通过的 `http(s)` 链接；`bgColor` 转 `#rrggbb`，图片图标按名称首字生成 emoji，远程 `bgImage` 不落盘。Dock 按 `dockIdList` 与原网站 id 映射，备份里缺失的引用只能跳过；`store-setting.followSystem` → `theme:'auto'`，`leftBarDisplayStatus:'hide'` → 折叠，`iconOpenMethod` → 新标签页开关；天气按 `addedCity` 经纬度就近映射到内置城市。导入使用 `Store.validateImport` 再清洗一次，且不带入 Lumen 的示例待办 / 便签。
+
 ## 5. 页面清单 / 验收点
 
 - 新标签页主界面：左侧分类栏 + 页头 + 右侧分类网格（网站 / 文件夹 / 组件 / 添加磁贴）、时钟、问候、搜索、Dock、底部提示
@@ -146,16 +150,19 @@ node qa/qa.mjs --mode full --shots          # 生成 docs/preview-*.png
 - [x] 扩展清单 + 图标
 - [x] CDP QA（三层）+ 响应式
 - [x] README / 交付
-- [x] GitHub 发布（`main`，版本 1.4.0）
+- [x] WeTab `.data` 备份导入（分类 / 网站 / Dock / 设置映射）
+- [x] GitHub 发布（`main`：1.4.0 初始，1.5.0 当前）
 
 ## 8. 验证记录（2026-10-26）
 
-- `node --test tests/unit.test.mjs` → **32/32**（日期/种子/URL/静态数据不变量/默认分类与网站/分类动作/v1 迁移/导入校验/危险协议/设置与壁纸白名单/异常集合清洗/AI 配置与助手设定清洗/密钥导出/OpenAI SSE 客户端/思考内容拆分/Markdown 渲染与转义/实时天气解析与 WMO 映射/10 分钟缓存与离线回退/新标签页打开失败不回退当前页/manifest/外部请求边界）
-- `node qa/qa.mjs --mode full --widths 390,768,1440` → **190/190**（交互回归单独跑为 154/154）
+- `node --test tests/unit.test.mjs` → **33/33**（日期/种子/URL/静态数据不变量/默认分类与网站/分类动作/v1 迁移/导入校验/危险协议/设置与壁纸白名单/异常集合清洗/AI 配置与助手设定清洗/密钥导出/OpenAI SSE 客户端/思考内容拆分/Markdown 渲染与转义/实时天气解析与 WMO 映射/10 分钟缓存与离线回退/新标签页打开失败不回退当前页/WeTab 备份识别、映射与清洗/manifest/外部请求边界）
+- `node qa/qa.mjs --mode full --widths 390,768,1440` → **194/194**（交互回归单独跑为 158/158）
   - 冒烟 16 项、交互 120+ 项、持久化 5 项、响应式 30+ 项（组件与网站/文件夹/侧栏分别验证）
   - 新增覆盖：侧栏切换分类、页头统计、点击打开网站、添加/右键编辑网站、文件夹新建与内部增删、弹窗层级与 Esc 顺序、拖到侧栏跨分类、侧栏分类拖拽排序、新建/重命名/删除分类、折叠与展开、组件库加到网站分类、刷新后分类/网站/文件夹/组件保留、v1 备份迁移
   - AI API 覆盖：设置入口、配置说明可见、配置保存、本机 Key 持久化、测试连接、API 请求使用配置模型/Key、助手设定注入系统提示词、请求携带本机上下文、SSE 流式回复入栈、思考内容单独保存并折叠渲染、Markdown 粗体/列表/代码块渲染、生成结束恢复按钮、导出不含 Key、本地模式零网络
   - 天气覆盖：QA 注入固定 Open-Meteo 响应，验证实时温度/风力/来源标记；设置切换「演示/实时」不额外发起请求；切城市后继续使用缓存
+  - WeTab 导入覆盖：合成 `.data` 备份识别、确认摘要、分类/网站/Dock 映射、仅含组件分类保留为空、`followSystem` → 自动主题、侧栏折叠、不混入 Lumen 示例待办；导入后恢复 Lumen 备份
+  - 实际 WeTab 备份转换校验：12 个分类、124 个网站、1 个 Dock，跳过 1 个非 http(s) 本地链接、30 个组件和远程壁纸；空分类 2 个
   - 交互审计新增：侧栏提示浮层不被裁剪、菜单边缘不出界与内部滚动、菜单键盘导航/Shift+F10 定位、弹窗-组件库-设置面板的 Tab 循环与回焦、遮罩关闭文件夹、浮层打开时 `/` 与 `?` 不抢焦点、Esc 关搜索引擎菜单、满文件夹拖入不丢网站、拖动把手单击后释放、危险协议在表单层被拒、导入前二次确认、输入法组合中 Enter 不误选联想、便签切换前自动保存、紧凑布局开关、网站右键上移
 - `node qa/qa.mjs --mode extension` → **4/4**（新标签页接管 `chrome-extension://…/index.html`，10 卡片渲染，清单可读）
 - `QA_REAL_WEATHER=1 node qa/qa.mjs --mode smoke` → **16/16**：跳过天气 mock，用真实 Open-Meteo 验证联网；默认 QA 仍注入固定响应，避免依赖第三方网络。
@@ -182,7 +189,9 @@ node qa/qa.mjs --mode full --shots          # 生成 docs/preview-*.png
 - 设置里的「默认搜索引擎」下拉启动时填充 5 个引擎并回显当前值；搜索栏切换引擎后下拉同步，设置切换后搜索栏也即时同步
 - 原生 `<select>` 的弹出列表单独设置 `color-scheme` 与 `option` 背景/文字色：暗色主题用 `#0d1321`、浅色主题用白色，避免系统弹层纯白
 - 搜索与网址直跳固定用 `_blank + noopener` 打开；不再把 `window.open` 在 noopener 下的 `null` 返回值误判为拦截并回退 `location.href`，当前页始终保留
-- 状态标记：版本 `1.4.0`；单元 32/32、交互 154/154、全量 190/190、扩展 4/4
+- 状态标记：版本 `1.5.0`；单元 33/33、交互 158/158、全量 194/194、扩展 4/4
+- 新增 `webtab-import.js`：识别 WeTab `.data` 的 `data.store-icon.icons`，导入分类、网站、Dock、主题 / 侧栏 / 打开方式 / 天气城市；图片图标转文字色块，组件与远程壁纸不导入；所有 URL 与名称仍走 `Store.validateImport` 清洗
+- 修复主题白名单未包含 `auto` 的问题：跟随系统主题现在能在刷新和导入后保留
 - 新增 AI API 配置：设置 → AI 可切换本地/API、填写地址/模型/Key/温度/上限，支持常用服务快捷填充、测试连接、保存状态与错误提示
 - AI 配置页新增固定「AI 助手配置说明」（本地/API 选择、地址与 Key 填法、测试→保存、CORS 与安全提示），并新增可选「助手设定」系统提示词（≤2000 字，仅 API 模式生效，随对话注入 system 消息）
 - 新增 `ai-api.js`：OpenAI 兼容 `POST /chat/completions`、Bearer Key、SSE 增量解析、超时与中止、HTTP 错误详情；`host_permissions` 支持扩展直连

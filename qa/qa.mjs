@@ -1045,6 +1045,83 @@ async function main() {
   check('导入备份：数据替换', importTest.todos.join(',') === '来自备份的待办', importTest.todos.join(','));
   check('导入备份：界面同步', importTest.domTodo === '来自备份的待办' && importTest.cards === 10, importTest.domTodo);
 
+  /* ---------------- 导入 WeTab 备份（合成小样本，避免依赖本机文件） ---------------- */
+  const webtabImport = await evaluate(`(async () => {
+    const wait = ms => new Promise(r => setTimeout(r, ms));
+    const before = LumenApp.store.exportJSON();
+    const backup = {
+      version: '2.2.50', branch: 'zh', platform: 'edge',
+      data: {
+        'store-icon': {
+          icons: [
+            {
+              id: 'wt-cat-a', name: 'WeTab 迁移', iconClass: 'icon-gongju',
+              children: [
+                {
+                  type: 'site', id: 'wt-site-a', name: 'WeTab 示例',
+                  target: 'https://example.com/wetab',
+                  bgType: 'color', bgColor: 'rgba(28, 28, 30, 1)'
+                },
+                { type: 'widget', id: 'wt-widget-a', name: 'AI', widgetName: 'widget-chatgpt' }
+              ]
+            },
+            { id: 'wt-cat-b', name: '空分类', iconClass: 'i:stars-28-outline-bold', children: [] }
+          ],
+          dockIdList: ['wt-site-a']
+        },
+        'store-setting': { followSystem: true, leftBarDisplayStatus: 'hide', iconOpenMethod: 'new-tab' },
+        'store-weather': {
+          activeCityId: 'wt-city',
+          addedCity: [{ id: 'wt-city', name: '西安', lat: '34.34321', lon: '108.93965' }]
+        }
+      }
+    };
+
+    async function importFile(obj, name) {
+      const input = document.getElementById('importFile');
+      const dt = new DataTransfer();
+      dt.items.add(new File([JSON.stringify(obj)], name, { type: 'application/json' }));
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait(320);
+      const dialog = document.getElementById('dialogBox');
+      const message = dialog ? (dialog.querySelector('.muted') || {}).textContent || '' : '';
+      const confirmBtn = [...document.querySelectorAll('#dialogBox button')].find(b => b.textContent.trim() === '导入');
+      if (confirmBtn) confirmBtn.click();
+      await wait(720);
+      return { shown: !!confirmBtn, message: message };
+    }
+
+    const imported = await importFile(backup, 'wetab.data');
+    const s = LumenApp.store.get();
+    const sites = s.categories.reduce((n, c) => n + c.items.filter(i => i.kind === 'site').length, 0);
+    const out = {
+      shown: imported.shown,
+      message: imported.message,
+      categories: s.categories.length,
+      sites: sites,
+      empty: s.categories.filter(c => !c.items.length).length,
+      dock: s.shortcuts.length,
+      theme: s.settings.theme,
+      rail: s.settings.railCollapsed,
+      todos: s.todos.length,
+      railDom: document.body.classList.contains('rail-collapsed'),
+      railItems: document.querySelectorAll('.rail__item').length
+    };
+    await importFile(before, 'restore.json');
+    out.restoredTodo = LumenApp.store.get().todos.some(t => t.text === '来自备份的待办');
+    return out;
+  })()`);
+  check('WeTab 导入：弹出识别说明', webtabImport.shown === true && /WeTab 备份/.test(webtabImport.message), webtabImport.message);
+  check('WeTab 导入：分类 / 网站 / Dock / 空分类',
+    webtabImport.categories === 2 && webtabImport.sites === 1 && webtabImport.dock === 1 && webtabImport.empty === 1,
+    `${webtabImport.categories}/${webtabImport.sites}/${webtabImport.dock}/${webtabImport.empty}`);
+  check('WeTab 导入：主题 / 侧栏 / 不混入示例待办',
+    webtabImport.theme === 'auto' && webtabImport.rail === true && webtabImport.railDom === true &&
+    webtabImport.railItems === 2 && webtabImport.todos === 0,
+    `${webtabImport.theme}/${webtabImport.rail}/${webtabImport.railDom}/${webtabImport.railItems}/${webtabImport.todos}`);
+  check('WeTab 导入后可恢复 Lumen 备份', webtabImport.restoredTodo === true);
+
   /* ---------------- 侧边栏 / 分类页 / 网站 / 文件夹 ---------------- */
   const sidebar = await evaluate(`(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
