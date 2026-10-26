@@ -1,0 +1,21 @@
+# OS / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# 依赖 / 构建 / 日志
+node_modules/
+coverage/
+*.log
+
+# 本地环境与备份
+.env
+.env.*
+*.local
+*.zip
+
+# QA 临时目录
+qa/.tmp/

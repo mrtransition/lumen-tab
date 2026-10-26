@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="dark" data-accent="cyan">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <meta name="description" content="Lumen Tab — 离线可用的新标签页：分类侧栏、网站与文件夹、小组件、搜索、可切换本地规则与 API 模型的 AI 助手。">
+  <title>Lumen Tab · 流光新标签页</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%230b1020'/%3E%3Ccircle cx='16' cy='16' r='7' fill='none' stroke='%2338bdf8' stroke-width='2.4'/%3E%3Ccircle cx='16' cy='16' r='2.4' fill='%2338bdf8'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/widgets.css">
+  <link rel="stylesheet" href="css/pages.css">
+  <link rel="stylesheet" href="css/panels.css">
+</head>
+<body>
+  <!-- 壁纸层 -->
+  <div class="wallpaper" id="wallpaper" aria-hidden="true">
+    <div class="wallpaper__img" id="wallpaperImg"></div>
+    <div class="wallpaper__scrim" id="wallpaperScrim"></div>
+    <div class="wallpaper__grain"></div>
+  </div>
+
+  <div class="shell" id="shell">
+    <aside class="rail" id="rail" aria-label="分类栏">
+      <div class="rail__list" id="railList" role="navigation" aria-label="分类"></div>
+      <div class="rail__foot">
+        <button class="rail__add" type="button" id="railAdd" aria-label="新建分类" title="新建分类">
+          <span data-icon="plus" data-size="20"></span>
+        </button>
+      </div>
+    </aside>
+
+    <div class="app" id="app">
+      <header class="topbar">
+        <div class="topbar__left">
+          <button class="icon-btn icon-btn--ghost topbar__rail" type="button" data-rail-toggle aria-label="收起分类栏" title="收起分类栏">
+            <span data-icon="sidebar" data-size="19"></span>
+          </button>
+          <div class="clock-block">
+            <div class="clock" id="clock">--:--</div>
+            <div class="clock__meta">
+              <span id="clockDate">--</span>
+              <span class="dot">·</span>
+              <span id="clockYear">--</span>
+            </div>
+          </div>
+        </div>
+        <div class="topbar__actions">
+          <button class="pill-btn" type="button" data-open="ai" aria-haspopup="dialog">
+            <span data-icon="sparkles" data-size="18"></span><span class="pill-btn__label">AI 助手</span>
+          </button>
+          <button class="icon-btn" type="button" data-open="library" aria-label="组件库" title="组件库">
+            <span data-icon="grid" data-size="19"></span>
+          </button>
+          <button class="icon-btn" type="button" data-open="settings" aria-label="设置" title="设置">
+            <span data-icon="settings" data-size="19"></span>
+          </button>
+        </div>
+      </header>
+
+    <main class="main">
+      <section class="hero" aria-label="搜索与常用网站">
+        <p class="hero__hello">
+          <span class="hero__greet" id="heroGreeting">你好</span>
+          <span class="hero__sub" id="heroSub">今天想做点什么？</span>
+        </p>
+
+        <form class="searchbar" id="searchForm" role="search" autocomplete="off">
+          <button class="searchbar__engine" type="button" id="engineBtn" aria-haspopup="listbox" aria-expanded="false" title="切换搜索引擎">
+            <span class="engine-badge" id="engineBadge">B</span>
+            <span class="engine-name" id="engineName">必应</span>
+            <span data-icon="chevron-down" data-size="15"></span>
+          </button>
+          <input id="searchInput" class="searchbar__input" type="text" placeholder="搜索，或直接输入网址" aria-label="搜索" spellcheck="false" autocapitalize="off">
+          <button class="searchbar__go" type="submit" aria-label="开始搜索">
+            <span data-icon="arrow-right" data-size="20"></span>
+          </button>
+          <div class="engine-menu" id="engineMenu" role="listbox" aria-label="搜索引擎" hidden></div>
+          <div class="suggest" id="suggest" hidden></div>
+        </form>
+
+        <div class="dock" id="dock" aria-label="常用网站"></div>
+      </section>
+
+      <div class="page-head" id="pageHead"></div>
+
+      <section class="widgets" id="widgetsGrid" aria-label="分类内容" aria-live="polite"></section>
+    </main>
+
+    <footer class="footer">
+      <span class="footer__hint"><kbd>/</kbd> 搜索</span>
+      <span class="footer__hint"><kbd>Ctrl</kbd><kbd>K</kbd> 助手</span>
+      <span class="footer__hint"><kbd>?</kbd> 快捷键</span>
+      <span class="footer__hint footer__hint--soft">数据只存本地 · 无外部请求</span>
+      <button class="footer__btn" id="editLayoutBtn" type="button">
+        <span data-icon="layout-grid" data-size="15"></span><span>整理布局</span>
+      </button>
+    </footer>
+    </div>
+  </div>
+
+  <div class="scrim" id="scrim" hidden></div>
+
+  <!-- 本地 AI 助手 -->
+  <aside class="panel panel--ai" id="aiPanel" role="dialog" aria-modal="true" aria-labelledby="aiTitle" aria-hidden="true">
+    <header class="panel__head">
+      <div class="panel__title" id="aiTitle">
+        <span class="panel__title-ico" data-icon="sparkles" data-size="18"></span>
+        Lumen 助手
+        <span class="tag" id="aiModeTag">本地规则</span>
+      </div>
+      <div class="panel__head-actions">
+        <button class="icon-btn" type="button" id="aiConfigBtn" aria-label="AI 接口设置" title="AI 接口设置">
+          <span data-icon="settings" data-size="18"></span>
+        </button>
+        <button class="icon-btn" type="button" data-close="panel" aria-label="关闭助手">
+          <span data-icon="x" data-size="18"></span>
+        </button>
+      </div>
+    </header>
+    <div class="ai-messages" id="aiMessages"></div>
+    <div class="ai-chips" id="aiChips">
+      <button type="button" data-prompt="帮我安排今天">安排今天</button>
+      <button type="button" data-prompt="总结一下我的待办">总结待办</button>
+      <button type="button" data-prompt="今天天气怎么样">看天气</button>
+      <button type="button" data-prompt="给我一点鼓励">求鼓励</button>
+      <button type="button" data-prompt="我的习惯坚持得怎么样">看习惯</button>
+    </div>
+    <form class="ai-input" id="aiForm">
+      <input id="aiInput" type="text" placeholder="问点什么…例如：今天还剩多少天" aria-label="对助手说" autocomplete="off">
+      <button class="send-btn" type="submit" id="aiSendBtn" aria-label="发送">
+        <span data-icon="arrow-up" data-size="18"></span>
+      </button>
+      <button class="send-btn ai-stop-btn" type="button" id="aiStopBtn" aria-label="停止生成" hidden>
+        <span data-icon="stop" data-size="16"></span>
+      </button>
+    </form>
+    <p class="panel__note" id="aiNote">离线规则引擎，不会发起网络请求；回复基于你本机数据。</p>
+  </aside>
+
+  <!-- 设置 -->
+  <aside class="panel panel--settings" id="settingsPanel" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" aria-hidden="true">
+    <header class="panel__head">
+      <div class="panel__title" id="settingsTitle">
+        <span class="panel__title-ico" data-icon="settings" data-size="18"></span>
+        设置
+      </div>
+      <button class="icon-btn" type="button" data-close="panel" aria-label="关闭设置">
+        <span data-icon="x" data-size="18"></span>
+      </button>
+    </header>
+    <nav class="tabs" role="tablist" aria-label="设置分类">
+      <button class="tab is-active" type="button" role="tab" aria-selected="true" data-tab="appearance">外观</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="categories">分类</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="widgets">组件</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="ai">AI</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="data">数据</button>
+      <button class="tab" type="button" role="tab" aria-selected="false" data-tab="about">关于</button>
+    </nav>
+
+    <div class="panel__body">
+      <section class="pane" data-pane="appearance">
+        <h3>主题</h3>
+        <div class="segment" id="themeSeg" role="group" aria-label="主题">
+          <button type="button" data-value="dark">深色</button>
+          <button type="button" data-value="light">浅色</button>
+          <button type="button" data-value="auto">跟随系统</button>
+        </div>
+
+        <h3>主题色</h3>
+        <div class="swatches" id="accentSwatches" role="group" aria-label="主题色"></div>
+
+        <h3>壁纸</h3>
+        <div class="wallpapers" id="wallpaperList" role="group" aria-label="壁纸"></div>
+        <div class="range-row">
+          <label for="blurRange">模糊</label>
+          <input type="range" id="blurRange" min="0" max="24" step="1">
+          <output id="blurOut">0px</output>
+        </div>
+        <div class="range-row">
+          <label for="dimRange">暗度</label>
+          <input type="range" id="dimRange" min="0" max="80" step="1">
+          <output id="dimOut">32%</output>
+        </div>
+        <label class="switch-row" for="dailyWallpaper">
+          <span>每日自动更换壁纸</span>
+          <input type="checkbox" id="dailyWallpaper">
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+        <div class="btn-row">
+          <button class="ghost-btn" type="button" id="uploadWallpaperBtn">
+            <span data-icon="image" data-size="16"></span>上传本地图片
+          </button>
+          <button class="ghost-btn" type="button" id="clearWallpaperBtn">恢复默认壁纸</button>
+          <input type="file" id="wallpaperFile" accept="image/*" hidden>
+        </div>
+
+        <h3>时间与搜索</h3>
+        <div class="field-row">
+          <label for="engineSelect">默认搜索引擎</label>
+          <select id="engineSelect"></select>
+        </div>
+        <div class="field-row">
+          <label for="weatherSourceSelect">天气数据源</label>
+          <select id="weatherSourceSelect">
+            <option value="live">实时（联网）</option>
+            <option value="demo">演示（离线）</option>
+          </select>
+        </div>
+        <p class="muted ai-hint">实时天气使用 Open-Meteo，无需 Key；只发送所选城市的经纬度。切到「演示」可完全离线。</p>
+        <label class="switch-row" for="showSeconds">
+          <span>时钟显示秒</span>
+          <input type="checkbox" id="showSeconds">
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+        <label class="switch-row" for="compactDensity">
+          <span>紧凑布局</span>
+          <input type="checkbox" id="compactDensity">
+          <i class="switch" aria-hidden="true"></i>
+        </label>
+        <div class="field-row">
+          <label for="nameInput">称呼</label>
+          <input type="text" id="nameInput" maxlength="12" placeholder="留空则省略">
+        </div>
+      </section>
+
+      <section class="pane" data-pane="categories" hidden>
+        <p class="muted" id="categoryPaneNote">分类就是左侧栏里的页面，每个分类可以放网站、文件夹和组件；点侧栏图标即可切换。</p>
+        <div class="cat-list" id="settingsCategoryList"></div>
+        <button class="ghost-btn" type="button" id="addCategoryBtn">
+          <span data-icon="plus" data-size="16"></span>新建分类
+        </button>
+      </section>
+
+      <section class="pane" data-pane="widgets" hidden>
+        <p class="muted">勾选即显示在当前分类；移动到其它分类请用卡片菜单，或直接拖到左侧分类上。</p>
+        <div class="lib-list" id="settingsWidgetList"></div>
+        <button class="ghost-btn" type="button" data-open="library">
+          <span data-icon="plus" data-size="16"></span>打开组件库
+        </button>
+      </section>
+
+      <section class="pane" data-pane="ai" hidden>
+        <div class="ai-guide">
+          <h3>AI 助手配置说明</h3>
+          <ol class="ai-guide__steps">
+            <li><strong>本地规则</strong>：不用填任何配置，不联网，可以直接管理待办和番茄钟。</li>
+            <li><strong>API 模型</strong>：选择「API 模型」，点下方常用服务自动填充，或手动填写接口地址（通常以 <code>/v1</code> 结尾）、模型名和 API Key。</li>
+            <li>点「测试连接」确认能通，再点「保存配置」；之后打开 AI 助手即可对话。</li>
+            <li>直接双击页面时可能遇到服务端 CORS 限制，推荐用扩展模式；Key 只保存在本机，导出备份不会包含。</li>
+          </ol>
+        </div>
+
+        <h3>AI 模式</h3>
+        <p class="muted">默认使用本地规则引擎，不联网。切换到 API 模式后，对话与本机待办摘要会发送到你填写的服务。</p>
+        <div class="segment" id="aiModeSeg" role="group" aria-label="AI 模式">
+          <button type="button" data-value="local">本地规则</button>
+          <button type="button" data-value="api">API 模型</button>
+        </div>
+
+        <h3>接口配置</h3>
+        <div class="field-row">
+          <label for="aiBaseUrl">接口地址</label>
+          <input type="url" id="aiBaseUrl" placeholder="https://api.openai.com/v1" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field-row">
+          <label for="aiModel">模型</label>
+          <input type="text" id="aiModel" placeholder="例如 gpt-4o-mini / deepseek-chat" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field-row">
+          <label for="aiApiKey">API Key</label>
+          <input type="password" id="aiApiKey" placeholder="本地服务可留空" autocomplete="new-password" spellcheck="false">
+        </div>
+        <div class="field-row">
+          <label for="aiTemperature">温度</label>
+          <input type="number" id="aiTemperature" min="0" max="2" step="0.1" value="0.7">
+        </div>
+        <div class="field-row">
+          <label for="aiMaxTokens">最大输出</label>
+          <input type="number" id="aiMaxTokens" min="1" max="4096" step="1" value="800">
+        </div>
+
+        <h3>助手设定 <span class="tag">可选</span></h3>
+        <p class="muted ai-hint">仅 API 模式生效，会追加到系统提示词。可写角色、语气、回答格式或限制；留空使用默认助手设定。</p>
+        <textarea id="aiInstructions" class="ai-instructions" rows="3" maxlength="2000"
+          placeholder="例如：你是我的学习教练。回答先给结论，再列 3 条行动建议，控制在 200 字以内。"></textarea>
+
+        <p class="muted ai-hint">兼容 OpenAI Chat Completions 接口。地址一般以 <code>/v1</code> 结尾；本地 Ollama 可用 <code>http://localhost:11434/v1</code>。</p>
+        <div class="btn-row">
+          <button class="ghost-btn" type="button" id="aiTestBtn">测试连接</button>
+          <button class="primary-btn" type="button" id="aiSaveBtn">保存配置</button>
+        </div>
+        <p class="ai-status" id="aiConfigStatus" role="status"></p>
+        <p class="muted ai-hint">API Key 只保存在本机 localStorage，导出备份时不会写入；请勿在公共电脑上保存私人 Key。</p>
+
+        <h3>常用服务</h3>
+        <div class="ai-preset-row" id="aiPresets">
+          <button type="button" class="ghost-btn" data-base="https://api.openai.com/v1" data-model="gpt-4o-mini">OpenAI</button>
+          <button type="button" class="ghost-btn" data-base="https://api.deepseek.com/v1" data-model="deepseek-chat">DeepSeek</button>
+          <button type="button" class="ghost-btn" data-base="https://dashscope.aliyuncs.com/compatible-mode/v1" data-model="qwen-plus">通义千问</button>
+          <button type="button" class="ghost-btn" data-base="https://open.bigmodel.cn/api/paas/v4" data-model="glm-4-flash">智谱</button>
+          <button type="button" class="ghost-btn" data-base="http://localhost:11434/v1" data-model="llama3.1">Ollama 本地</button>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="data" hidden>
+        <h3>备份与恢复</h3>
+        <p class="muted">导出为 JSON 文件，换设备时再导入；分类、网站、组件与设置都会带上，API Key 除外。</p>
+        <div class="btn-row">
+          <button class="ghost-btn" type="button" id="exportBtn">
+            <span data-icon="download" data-size="16"></span>导出备份
+          </button>
+          <label class="ghost-btn" for="importFile">
+            <span data-icon="upload" data-size="16"></span>导入备份
+            <input type="file" id="importFile" accept="application/json,.json" hidden>
+          </label>
+        </div>
+        <h3>存储</h3>
+        <p class="muted" id="storageNote">数据保存在本机 localStorage（lumenTab.v1），不会上传服务器。</p>
+        <div class="btn-row">
+          <button class="ghost-btn" type="button" id="clearHistoryBtn">清空搜索历史</button>
+          <button class="danger-btn" type="button" id="resetBtn">
+            <span data-icon="refresh" data-size="16"></span>恢复默认
+          </button>
+        </div>
+      </section>
+
+      <section class="pane" data-pane="about" hidden>
+        <h3>Lumen Tab <span class="tag">v1.4.0</span></h3>
+        <p class="muted">一个离线可用的新标签页：分类侧栏、网站与文件夹、小组件、搜索和 AI 助手。默认本地规则；联网入口只有实时天气（Open-Meteo，可切演示）与主动开启的 AI API 模式。</p>
+        <h3>快捷键</h3>
+        <ul class="key-list">
+          <li><kbd>/</kbd><span>聚焦搜索框</span></li>
+          <li><kbd>Ctrl</kbd><kbd>K</kbd><span>打开 / 关闭 AI 助手</span></li>
+          <li><kbd>?</kbd><span>打开快捷键说明</span></li>
+          <li><kbd>Esc</kbd><span>关闭浮层</span></li>
+          <li><kbd>Enter</kbd><span>在搜索联想中确认</span></li>
+        </ul>
+        <h3>安装为浏览器新标签页</h3>
+        <ol class="plain-list">
+          <li>打开 <code>edge://extensions</code> 或 <code>chrome://extensions</code></li>
+          <li>开启「开发者模式」</li>
+          <li>选择「加载解压缩的扩展」，指向本目录 <code>product/</code></li>
+          <li>新开标签页即生效</li>
+        </ol>
+        <p class="muted">天气默认实时（Open-Meteo），可在设置 → 外观切到演示；热榜、名句为内置演示数据。</p>
+      </section>
+    </div>
+  </aside>
+
+  <!-- 组件库 -->
+  <div class="modal" id="libraryModal" hidden>
+    <div class="modal__box" role="dialog" aria-modal="true" aria-labelledby="libTitle">
+      <header class="modal__head">
+        <div>
+          <h2 id="libTitle">组件库</h2>
+          <p class="muted">添加到侧边栏当前分类，随时可以隐藏或移动。</p>
+        </div>
+        <button class="icon-btn" type="button" data-close="modal" aria-label="关闭组件库">
+          <span data-icon="x" data-size="18"></span>
+        </button>
+      </header>
+      <div class="lib-grid" id="libGrid"></div>
+    </div>
+  </div>
+
+  <!-- 通用弹窗（快捷方式 / 确认） -->
+  <div class="modal" id="dialogModal" hidden>
+    <div class="modal__box modal__box--sm" role="dialog" aria-modal="true" id="dialogBox"></div>
+  </div>
+
+  <!-- 文件夹 -->
+  <div class="modal" id="folderModal" hidden>
+    <div class="modal__box modal__box--folder" role="dialog" aria-modal="true" aria-labelledby="folderTitle">
+      <header class="modal__head">
+        <div>
+          <h2 id="folderTitle">文件夹</h2>
+          <p class="muted" id="folderMeta"></p>
+        </div>
+        <button class="icon-btn" type="button" data-close="folder" aria-label="关闭文件夹">
+          <span data-icon="x" data-size="18"></span>
+        </button>
+      </header>
+      <div class="folder-sites" id="folderSites"></div>
+      <footer class="modal__foot">
+        <button class="ghost-btn" type="button" data-folder-act="add">
+          <span data-icon="plus" data-size="15"></span>添加网站
+        </button>
+        <button class="ghost-btn" type="button" data-folder-act="rename">
+          <span data-icon="pencil" data-size="15"></span>重命名
+        </button>
+        <span class="modal__foot-gap"></span>
+        <button class="danger-btn" type="button" data-folder-act="delete">
+          <span data-icon="trash" data-size="15"></span>删除文件夹
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- 右键菜单 -->
+  <div class="menu" id="ctxMenu" role="menu" tabindex="-1" hidden></div>
+
+  <div class="toast-wrap" id="toastWrap" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="js/icons.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/weather.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/widgets-core.js"></script>
+  <script src="js/widgets-prod.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/ai-api.js"></script>
+  <script src="js/markdown.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

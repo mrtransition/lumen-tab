@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Lumen Tab · 流光新标签页",
+  "short_name": "Lumen Tab",
+  "version": "1.4.0",
+  "description": "离线可用的新标签页：分类侧栏、网站与文件夹、小组件、搜索和可配置 API 模型的 AI 助手。数据只存本机。",
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "action": {
+    "default_title": "Lumen Tab · 流光新标签页"
+  },
+  "icons": {
+    "16": "assets/icon-16.png",
+    "32": "assets/icon-32.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
+  "permissions": [],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "offline_enabled": true
+}
