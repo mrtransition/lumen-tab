@@ -4,7 +4,8 @@
 
 ## 1. 运行环境与仓库
 
-- 仓库：<https://github.com/mrtransition/lumen-tab>（公开）
+- 仓库：<https://github.com/mrtransition/lumen-tab>（公开，默认分支 `main`）
+- 首次发布：2026-10-26，初始版本 `1.4.0`（初始提交 `d774a73`）
 - 目标浏览器：Chrome / Edge，扩展使用 Manifest V3；页面在 `file://` 下可直接打开。
 - Node.js 22+（`node:test` + 内置 WebSocket）；无构建步骤、无 npm 依赖。
 - QA 默认查找 Windows Edge / Chrome，可用 `EDGE_PATH` 指定其它路径；`QA_REAL_WEATHER=1` 可跳过天气 mock。
@@ -145,6 +146,7 @@ node qa/qa.mjs --mode full --shots          # 生成 docs/preview-*.png
 - [x] 扩展清单 + 图标
 - [x] CDP QA（三层）+ 响应式
 - [x] README / 交付
+- [x] GitHub 发布（`main`，版本 1.4.0）
 
 ## 8. 验证记录（2026-10-26）
 
