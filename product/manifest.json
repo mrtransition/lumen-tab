@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Lumen Tab · 流光新标签页",
   "short_name": "Lumen Tab",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "离线可用的新标签页：分类侧栏、网站与文件夹、小组件、搜索和可配置 API 模型的 AI 助手，支持导入 WeTab 备份。数据只存本机。",
   "chrome_url_overrides": {
     "newtab": "index.html"

@@ -11,6 +11,7 @@
   var TYPE_DELAY = 420;
   var busy = false;
   var abortCtrl = null;
+  var sessionVersion = 0;
 
   function init(context) {
     ctx = context;
@@ -23,6 +24,7 @@
     els.modeTag = document.getElementById('aiModeTag');
     els.note = document.getElementById('aiNote');
     els.configBtn = document.getElementById('aiConfigBtn');
+    els.newBtn = document.getElementById('aiNewBtn');
 
     els.form.addEventListener('submit', function (e) {
       e.preventDefault();
@@ -60,6 +62,8 @@
       if (ctx.openSettingsTab) ctx.openSettingsTab('ai');
       else if (root.LumenUI) root.LumenUI.openPanel('settings');
     });
+
+    if (els.newBtn) els.newBtn.addEventListener('click', startNewSession);
 
     ctx.store.on('settings', syncMode);
     syncMode();
@@ -142,6 +146,41 @@
   }
 
   /* ---------- 发送 ---------- */
+  function resetSession() {
+    sessionVersion += 1;
+    if (typingTimer) {
+      clearTimeout(typingTimer);
+      typingTimer = null;
+    }
+    if (abortCtrl) {
+      try { abortCtrl.abort(); } catch (err) { /* 忽略中止失败 */ }
+      abortCtrl = null;
+    }
+    setBusyUi(false);
+    if (els.input) els.input.value = '';
+    ctx.store.clearAiMessages();
+    renderMessages();
+    scrollToBottom();
+    if (els.input) els.input.focus();
+  }
+
+  function startNewSession() {
+    var current = ctx.store.get().aiMessages;
+    var hasHistory = current.some(function (m) { return m.role === 'user'; });
+    var ask = hasHistory
+      ? ctx.confirm({
+          title: '开始新会话',
+          message: '当前对话会从本机清除，且不会被重新加载。',
+          confirmText: '开始新会话'
+        })
+      : Promise.resolve(true);
+    ask.then(function (ok) {
+      if (!ok) return;
+      resetSession();
+      ctx.toast('已开始新会话', 'ok');
+    });
+  }
+
   function send(raw) {
     var text = String(raw || '').trim();
     if (!text || busy) return;
@@ -149,23 +188,24 @@
 
     // 清空对话始终在本地处理，不把控制指令发给模型
     if (has(text, ['清空对话', '清除对话', '清空聊天', '重置对话'])) {
-      ctx.store.clearAiMessages();
-      renderMessages();
+      resetSession();
       ctx.toast('对话已清空', 'ok');
       return;
     }
 
+    var epoch = sessionVersion;
     ctx.store.addAiMessage('user', text);
     renderMessages();
     var ai = (ctx.store.get().settings.ai) || {};
-    if (ai.mode === 'api') sendViaApi(ai);
-    else sendLocal(text);
+    if (ai.mode === 'api') sendViaApi(ai, epoch);
+    else sendLocal(text, epoch);
   }
 
-  function sendLocal(text) {
+  function sendLocal(text, epoch) {
     var typing = appendTyping();
     if (typingTimer) clearTimeout(typingTimer);
     typingTimer = setTimeout(function () {
+      if (epoch !== sessionVersion) return;
       typing.remove();
       var answer = reply(text);
       ctx.store.addAiMessage('ai', answer);
@@ -265,7 +305,7 @@
     return [{ role: 'system', content: apiContext() }].concat(history);
   }
 
-  function sendViaApi(ai) {
+  function sendViaApi(ai, epoch) {
     var API = root.LumenAIApi;
     if (!API) {
       appendError('接口模块没有加载，请刷新页面后重试。');
@@ -305,7 +345,7 @@
     API.chat(apiConfig(), apiMessages(), {
       signal: abortCtrl.signal,
       onReasoning: function (piece) {
-        if (!busy) return;
+        if (epoch !== sessionVersion || !busy) return;
         var ui = ensureStream();
         reasoning += piece;
         ui.think.hidden = false;
@@ -316,7 +356,7 @@
         scrollToBottom();
       },
       onDelta: function (piece) {
-        if (!busy) return;
+        if (epoch !== sessionVersion || !busy) return;
         var ui = ensureStream();
         answer += piece;
         paintAiBubble(ui.bubble, answer);
@@ -326,6 +366,7 @@
     }).then(function (res) {
       typing.remove();
       if (stream) stream.el.remove();
+      if (epoch !== sessionVersion) return;
       var finalText = String(res.text || answer || '').trim();
       var finalReasoning = String(res.reasoning || reasoning || '').trim();
       if (!finalText) throw new Error('模型没有返回文本');
@@ -334,6 +375,7 @@
     }).catch(function (err) {
       typing.remove();
       if (stream) stream.el.remove();
+      if (epoch !== sessionVersion) return;
       if (err && err.name === 'AbortError') {
         persistPartial('（已停止生成）');
         ctx.toast('已停止生成', 'ok');
@@ -343,6 +385,7 @@
       appendError((err && err.message) || '请求失败');
       ctx.toast((err && err.message) || 'AI 请求失败', 'err');
     }).finally(function () {
+      if (epoch !== sessionVersion) return;
       abortCtrl = null;
       setBusyUi(false);
       if (els.input) els.input.focus();

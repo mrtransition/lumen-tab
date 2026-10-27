@@ -40,9 +40,17 @@ html[data-theme="light"] .panel { background: rgba(255, 255, 255, 0.9); }
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
   font-size: 14.5px;
   font-weight: 650;
   letter-spacing: 0.01em;
+}
+
+#aiModeTag {
+  max-width: 132px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .panel__title-ico {

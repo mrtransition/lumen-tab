@@ -907,6 +907,42 @@ async function main() {
     const persisted = (JSON.parse(localStorage.getItem('lumenTab.v1') || '{}').settings || {}).ai || {};
     const apiCall = calls.find(c => c.body.stream);
     const pingCall = calls.find(c => !c.body.stream);
+
+    // 新会话：请求没完成时清空，迟到回复不能写回新会话
+    let releaseStale;
+    window.fetch = () => new Promise(resolve => {
+      releaseStale = () => resolve(new Response(
+        'data: {"choices":[{"delta":{"content":"旧会话迟到回复"}}]}\\n\\ndata: [DONE]\\n\\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } }
+      ));
+    });
+    aiInput.value = '旧会话的慢请求';
+    document.getElementById('aiForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await wait(140);
+    const newBtn = document.getElementById('aiNewBtn');
+    newBtn.click();
+    await wait(100);
+    const newConfirmOpen = !document.getElementById('dialogModal').hidden;
+    const newConfirmTitle = (document.querySelector('#dialogBox h2') || {}).textContent || '';
+    document.querySelector('#confirmForm .primary-btn').click();
+    await wait(100);
+    const resetImmediately = LumenApp.store.get().aiMessages;
+    if (releaseStale) releaseStale();
+    await wait(220);
+    const afterStale = LumenApp.store.get().aiMessages;
+    const newSession = {
+      button: !!newBtn,
+      confirm: newConfirmOpen,
+      title: newConfirmTitle,
+      beforeCount: msgs.length,
+      afterResetCount: resetImmediately.length,
+      afterStaleCount: afterStale.length,
+      afterStaleRoles: afterStale.map(m => m.role).join(','),
+      dom: document.querySelectorAll('#aiMessages .msg').length,
+      input: aiInput.value,
+      busy: document.getElementById('aiForm').getAttribute('aria-busy'),
+      stopHidden: document.getElementById('aiStopBtn').hidden
+    };
     window.fetch = realFetch;
 
     LumenApp.store.patchSettings({ ai: { mode: 'local', baseUrl: '', model: '', apiKey: '', instructions: '', temperature: 0.7, maxTokens: 800 } });
@@ -933,7 +969,8 @@ async function main() {
       apiHasInstructions: !!(apiCall && apiCall.body.messages.some(m => m.role === 'system' &&
         m.content.includes('回答先给结论，控制在三点内。'))),
       apiHasUser: !!(apiCall && apiCall.body.messages.some(m => m.role === 'user' && m.content === '用配置的模型回答')),
-      pingUrl: pingCall && pingCall.url
+      pingUrl: pingCall && pingCall.url,
+      newSession
     };
   })()`);
   check('AI 设置入口打开 AI 标签', aiApi.tabActive === true && aiApi.settingsOpen === true);
@@ -963,6 +1000,13 @@ async function main() {
     `${aiApi.thinkSummary}/${aiApi.thinkText}`);
   check('生成结束后恢复发送按钮', aiApi.stopHidden === true && aiApi.sendVisible === true);
   check('导出的备份不含 API Key', aiApi.exportKey === '', aiApi.exportKey);
+  check('AI 新会话清空当前记录并拒绝迟到回复',
+    aiApi.newSession.button === true && aiApi.newSession.confirm === true &&
+    /新会话/.test(aiApi.newSession.title) && aiApi.newSession.beforeCount >= 3 &&
+    aiApi.newSession.afterResetCount === 1 && aiApi.newSession.afterStaleCount === 1 &&
+    aiApi.newSession.afterStaleRoles === 'ai' && aiApi.newSession.dom === 1 &&
+    aiApi.newSession.input === '' && aiApi.newSession.busy === 'false' && aiApi.newSession.stopHidden === true,
+    JSON.stringify(aiApi.newSession));
 
   await evaluate(`(() => { document.getElementById('aiPanel').querySelector('[data-close="panel"]').click(); })()`);
 
@@ -1214,7 +1258,7 @@ async function main() {
     out.dialogOverFolder = !document.getElementById('dialogModal').hidden;
     out.dialogZ = Number(getComputedStyle(document.getElementById('dialogModal')).zIndex);
     out.folderZ = Number(getComputedStyle(document.getElementById('folderModal')).zIndex);
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    document.querySelector('#siteForm [data-role="cancel"]').click();
     await wait(140);
     out.dialogClosed = document.getElementById('dialogModal').hidden;
     out.folderStillOpen = !document.getElementById('folderModal').hidden;
@@ -1236,7 +1280,7 @@ async function main() {
   check('打开文件夹弹窗', sidebar.folderOpen === true && sidebar.folderTitle === 'QA 文件夹', sidebar.folderTitle);
   check('文件夹内添加网站', sidebar.folderSites === 1 && sidebar.folderDomSites === 1, `${sidebar.folderSites}/${sidebar.folderDomSites}`);
   check('文件夹内弹窗层级正确', sidebar.dialogOverFolder === true && sidebar.dialogZ > sidebar.folderZ, `${sidebar.dialogZ}/${sidebar.folderZ}`);
-  check('Esc 先关弹窗再关文件夹', sidebar.dialogClosed === true && sidebar.folderStillOpen === true && sidebar.folderClosed === true);
+  check('取消按钮先关网站弹窗，Esc 再关文件夹', sidebar.dialogClosed === true && sidebar.folderStillOpen === true && sidebar.folderClosed === true);
 
   const manage = await evaluate(`(async () => {
     const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -1283,6 +1327,12 @@ async function main() {
     await wait(60);
     [...document.querySelectorAll('#ctxMenu .menu__item')].find(b => b.textContent.includes('重命名')).click();
     await wait(70);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await wait(80);
+    out.categoryEscBlocked = !document.getElementById('dialogModal').hidden;
+    document.getElementById('dialogModal').click();
+    await wait(80);
+    out.categoryBackdropBlocked = !document.getElementById('dialogModal').hidden;
     document.getElementById('catName').value = 'QA 分类2';
     document.getElementById('catForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
     await wait(220);
@@ -1335,6 +1385,7 @@ async function main() {
   check('新建分类', manage.categoriesAfterAdd === 6 && manage.railAfterAdd === 6, `${manage.categoriesAfterAdd}/${manage.railAfterAdd}`);
   check('新建分类自动切换', manage.activeAfterAdd === 'QA 分类', manage.activeAfterAdd);
   check('重命名分类', manage.renamedCategory === true, manage.railLabel);
+  check('分类弹窗同样只能点按钮关闭', manage.categoryEscBlocked === true && manage.categoryBackdropBlocked === true);
   check('设置里列出分类', manage.categoryRows === 6, manage.categoryRows);
   check('设置里删除分类', manage.confirmShown === true && manage.categoriesAfterDelete === 5, manage.categoriesAfterDelete);
   check('收起侧栏', manage.collapsed === true && manage.railDisplay === 'none', manage.railDisplay);
@@ -1393,7 +1444,7 @@ async function main() {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
     await wait(80);
 
-    // 取消弹窗：焦点回到触发按钮
+    // 网站弹窗必须点取消/添加/保存才会关闭：Esc 与点背景都不应关闭
     const addBtn = document.querySelector('.tile--add');
     addBtn.focus();
     addBtn.click();
@@ -1407,6 +1458,16 @@ async function main() {
     colorDot.click();
     out.colorPicked = document.getElementById('siteColor').value === colorDot.dataset.color;
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    await wait(100);
+    out.dialogEscBlocked = !document.getElementById('dialogModal').hidden;
+    document.getElementById('dialogModal').click();
+    await wait(100);
+    out.dialogBackdropBlocked = !document.getElementById('dialogModal').hidden;
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true }));
+    await wait(100);
+    out.dialogShortcutBlocked = !document.getElementById('dialogModal').hidden &&
+      !document.getElementById('aiPanel').classList.contains('is-open');
+    document.querySelector('#siteForm [data-role="cancel"]').click();
     await wait(120);
     out.dialogClosed = document.getElementById('dialogModal').hidden;
     out.focusBack = document.activeElement === addBtn;
@@ -1423,7 +1484,7 @@ async function main() {
     out.jsDialogOpen = !document.getElementById('dialogModal').hidden;
     out.jsError = (document.querySelector('#siteForm [data-role="error"]').textContent || '').includes('http');
     out.jsNotAdded = !LumenApp.store.get().categories.some(c => c.items.some(i => i.name === '危险站点'));
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    document.querySelector('#siteForm [data-role="cancel"]').click();
     await wait(120);
 
     // Tab 焦点限制在弹窗内
@@ -1436,7 +1497,7 @@ async function main() {
     submit.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }));
     await wait(60);
     out.dialogTabTrap = document.getElementById('dialogBox').contains(document.activeElement) && document.activeElement !== submit;
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+    document.querySelector('#siteForm [data-role="cancel"]').click();
     await wait(120);
 
     // 组件库 Tab 循环 + 关闭回焦
@@ -1553,6 +1614,8 @@ async function main() {
   check('Esc 关闭菜单并回焦', audit.menuClosed === true && audit.menuFocusRestored === true);
   check('键盘右键菜单靠近元素', audit.kbMenuNear === true);
   check('弹窗取消后焦点回到触发点', audit.dialogOpen === true && audit.dialogClosed === true && audit.focusBack === true);
+  check('分类/网站弹窗只能点按钮关闭', audit.dialogEscBlocked === true && audit.dialogBackdropBlocked === true &&
+    audit.dialogShortcutBlocked === true);
   check('颜色快捷选择有选中态', audit.colorActive === 1 && audit.colorPicked === true);
   check('弹窗拒绝危险协议', audit.jsDialogOpen === true && audit.jsError === true && audit.jsNotAdded === true);
   check('弹窗内 Tab 焦点循环', audit.dialogTabTrap === true);

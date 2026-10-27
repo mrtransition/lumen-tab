@@ -513,6 +513,18 @@ test('store: 内容集合导入清洗', () => {
   assert.deepEqual(s.quoteFav, [0]);
 });
 
+test('store: 新会话清空后只保留欢迎语', () => {
+  const store = Store({ storage: memStorage() });
+  store.addAiMessage('user', '旧问题');
+  store.addAiMessage('ai', '旧回答', '旧思考');
+  assert.equal(store.get().aiMessages.length, 3);
+  store.clearAiMessages();
+  const messages = store.get().aiMessages;
+  assert.equal(messages.length, 1);
+  assert.equal(messages[0].role, 'ai');
+  assert.match(messages[0].text, /你好/);
+});
+
 test('store: 重置回到默认', () => {
   const store = Store({ storage: memStorage() });
   store.addTodo('临时');

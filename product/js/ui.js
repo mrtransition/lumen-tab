@@ -10,6 +10,7 @@
   var els = {};
   var dialogResolver = null;
   var dialogPrevFocus = null;
+  var dialogDismissible = true;
   var libraryPrevFocus = null;
   var menuPrevFocus = null;
   var menuOpenedAt = 0;
@@ -147,8 +148,9 @@
 
   function openDialog(html, opts) {
     opts = opts || {};
-    if (!els.dialogModal.hidden) closeDialog(false);
+    if (!els.dialogModal.hidden) closeDialog(false, true);
     dialogPrevFocus = document.activeElement;
+    dialogDismissible = opts.dismissible !== false;
     els.dialogBox.innerHTML = html;
     var heading = els.dialogBox.querySelector('h2');
     if (heading) els.dialogBox.setAttribute('aria-label', heading.textContent);
@@ -160,9 +162,11 @@
     return els.dialogBox;
   }
 
-  function closeDialog(value) {
+  function closeDialog(value, force) {
     if (els.dialogModal.hidden) return false;
+    if (!force && !dialogDismissible) return false;
     els.dialogModal.hidden = true;
+    dialogDismissible = true;
     unlockScroll('dialog');
     var resolver = dialogResolver;
     dialogResolver = null;
@@ -269,7 +273,7 @@
   }
 
   function openPanel(name) {
-    closeDialog(null);
+    if (!els.dialogModal.hidden && !closeDialog(null)) return;
     closeMenu();
     closeFolderIfAny();
     closeLibrary();
@@ -311,7 +315,10 @@
 
   function handleEscape() {
     if (!els.ctxMenu.hidden) { closeMenu(); return true; }
-    if (!els.dialogModal.hidden) { closeDialog(false); return true; }
+    if (!els.dialogModal.hidden) {
+      if (dialogDismissible) closeDialog(false);
+      return true;
+    }
     if (!els.libraryModal.hidden) { closeLibrary(); return true; }
     if (closePanels()) return true;
     return false;
@@ -319,9 +326,9 @@
 
   /* ---------- 组件库 ---------- */
   function openLibrary() {
+    if (!els.dialogModal.hidden && !closeDialog(null)) return;
     libraryPrevFocus = document.activeElement;
     closePanels();
-    closeDialog(null);
     closeFolderIfAny();
     if (root.LumenSearch && typeof root.LumenSearch.closeMenus === 'function') root.LumenSearch.closeMenus();
     renderLibrary();
@@ -397,13 +404,14 @@
           '<input id="catEmoji" type="text" maxlength="8" value="' + esc(editing.emoji) + '" aria-label="分类图标">' +
           '<div class="emoji-pick" id="catEmojiPick">' + picks + '</div>' +
         '</div>' +
-        '<p class="form__hint">分类就是侧边栏的一个页面，可以放网站、文件夹和组件。</p>' +
+        '<p class="form__hint">分类就是侧边栏的一个页面，可以放网站、文件夹和组件；请用下方按钮关闭。</p>' +
         '<p class="form__error" data-role="error"></p>' +
         '<div class="form__actions">' +
           '<button type="button" class="ghost-btn" data-role="cancel">取消</button>' +
           '<button type="submit" class="primary-btn">' + (isEdit ? '保存' : '创建') + '</button>' +
         '</div>' +
-      '</form>'
+      '</form>',
+      { dismissible: false }
     );
     var form = els.dialogBox.querySelector('#catForm');
     var nameEl = form.querySelector('#catName');
@@ -422,17 +430,17 @@
       var emoji = U.firstGrapheme(emojiEl.value) || '📁';
       if (isEdit) {
         ctx.store.updateCategory(cat.id, { name: name, emoji: emoji });
-        closeDialog(true);
+        closeDialog(true, true);
         toast('分类已更新', 'ok');
       } else {
         var created = ctx.store.addCategory(name, emoji);
         if (!created) { errEl.textContent = '创建失败，请重试'; return; }
         ctx.store.setActiveCategory(created.id);
-        closeDialog(true);
+        closeDialog(true, true);
         toast('已创建分类「' + name + '」', 'ok');
       }
     });
-    form.querySelector('[data-role="cancel"]').addEventListener('click', function () { closeDialog(false); });
+    form.querySelector('[data-role="cancel"]').addEventListener('click', function () { closeDialog(false, true); });
   }
 
   /* ---------- 网站弹窗（分类 / 文件夹通用） ---------- */
@@ -466,13 +474,14 @@
           var on = String(editing.color || '').toLowerCase() === c.toLowerCase();
           return '<button type="button" class="color-dot' + (on ? ' is-active' : '') + '" data-color="' + c + '" style="background:' + c + '" aria-label="' + c + '" aria-pressed="' + on + '"></button>';
         }).join('') + '</div>' +
-        '<p class="form__hint">图标用一个 emoji 即可；留空会取名称首字。离线也能显示。</p>' +
+        '<p class="form__hint">图标用一个 emoji 即可；留空会取名称首字。离线也能显示。请用下方按钮关闭。</p>' +
         '<p class="form__error" data-role="error"></p>' +
         '<div class="form__actions">' +
           '<button type="button" class="ghost-btn" data-role="cancel">取消</button>' +
           '<button type="submit" class="primary-btn">' + (isEdit ? '保存' : '添加') + '</button>' +
         '</div>' +
-      '</form>'
+      '</form>',
+      { dismissible: false }
     );
     var form = els.dialogBox.querySelector('#siteForm');
     var nameEl = form.querySelector('#siteName');
@@ -520,10 +529,10 @@
           return;
         }
       }
-      closeDialog(true);
+      closeDialog(true, true);
       toast(isEdit ? '网站已更新' : '已添加「' + name + '」', 'ok');
     });
-    form.querySelector('[data-role="cancel"]').addEventListener('click', function () { closeDialog(false); });
+    form.querySelector('[data-role="cancel"]').addEventListener('click', function () { closeDialog(false, true); });
   }
 
   /* ---------- 通用文本弹窗 ---------- */
@@ -926,7 +935,7 @@
       if (e.target === els.libraryModal) closeLibrary();
     });
     els.dialogModal.addEventListener('click', function (e) {
-      if (e.target === els.dialogModal) closeDialog(false);
+      if (e.target === els.dialogModal && dialogDismissible) closeDialog(false);
     });
 
     // 浮层内 Tab 循环，避免焦点跑到背景页面
